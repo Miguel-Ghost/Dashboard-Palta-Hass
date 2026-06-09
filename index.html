@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Control Empresarial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-main: #141619;
+            --bg-card: #1D2024;
+            --border-color: #2D3238;
+            --text-primary: #F1F3F5;
+            --text-secondary: #9EA5B1;
+            --accent-blue: #3B82F6;
+            --accent-teal: #14B8A6;
+            --accent-purple: #8B5CF6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-teal);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-teal);
+        }
+
+        .controls-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .filter-group {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 12px 16px;
+            border-radius: 12px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .filter-group select {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+
+        .kpi-ventas::before { background-color: var(--accent-blue); }
+        .kpi-margen::before { background-color: var(--accent-purple); }
+        .kpi-pct::before { background-color: var(--accent-teal); }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-value {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .charts-row-main {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 992px) {
+            .charts-row-main { grid-template-columns: 1fr; }
+        }
+
+        .chart-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 340px;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 280px;
+        }
+
+        .table-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #25292F;
+            color: var(--text-primary);
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: #23272C; }
+        .text-right { text-align: right; }
+        .text-accent { color: var(--accent-teal); }
+        
+        .alert-box {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            color: #FCA5A5;
+            margin-bottom: 16px;
+            display: none;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <div id="alertBox" class="alert-box"></div>
+
+        <div class="header">
+            <div>
+                <h1>Dashboard de Desempeño Operacional</h1>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Sincronizado en tiempo real con Google Sheets</p>
+            </div>
+            <div class="status">
+                <div class="status-dot"></div>
+                <span id="syncStatus">Conectado a la Base de Datos</span>
+            </div>
+        </div>
+
+        <div class="controls-row">
+            <div class="filter-group">
+                <label for="filterSucursal">Sucursal / Aduana</label>
+                <select id="filterSucursal">
+                    <option value="ALL">Todas las Sucursales</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterCategoria">Categoría / Empresa</label>
+                <select id="filterCategoria">
+                    <option value="ALL">Todas las Categorías</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterMes">Mes Comercial</label>
+                <select id="filterMes">
+                    <option value="ALL">Todos los Meses</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-ventas">
+                <div class="kpi-label">Venta Total / Volumen (FOB)</div>
+                <div id="kpiVentas" class="kpi-value">S/ 0.00</div>
+            </div>
+            <div class="kpi-card kpi-margen">
+                <div class="kpi-label">Margen Operativo Estimado</div>
+                <div id="kpiMargen" class="kpi-value">S/ 0.00</div>
+            </div>
+            <div class="kpi-card kpi-pct">
+                <div class="kpi-label">% Rentabilidad Media</div>
+                <div id="kpiPorcentaje" class="kpi-value">0.0%</div>
+            </div>
+        </div>
+
+        <div class="charts-row-main">
+            <div class="chart-card">
+                <div class="chart-title">Evolución de Ventas y Márgenes por Mes</div>
+                <div class="chart-wrapper">
+                    <canvas id="chartMensual"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Distribución por Categorías (Top 5)</div>
+                <div class="chart-wrapper">
+                    <canvas id="chartCategorias"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 16px;">Análisis Consolidado Detallado</h3>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Sucursal / Región</th>
+                        <th>Categoría</th>
+                        <th>Mes</th>
+                        <th class="text-right">Monto Operado (S/)</th>
+                        <th class="text-right">Margen Neto (S/)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-secondary);">Cargando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Enlace de descarga e integración automática
+        const rawUrl = "https://docs.google.com/spreadsheets/d/1j9u2xERmKwXmD30NVb5bz0WYqpFwMVUILRbYLcp_2to/edit?usp=sharing";
+        const fileId = rawUrl.match(/\/d\/([^\/]+)/)[1];
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`;
+
+        let rawData = [];
+        let chartMensualInstance = null;
+        let chartCategoriasInstance = null;
+        const nombresMeses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fetchData();
+            document.getElementById('filterSucursal').addEventListener('change', updateDashboard);
+            document.getElementById('filterCategoria').addEventListener('change', updateDashboard);
+            document.getElementById('filterMes').addEventListener('change', updateDashboard);
+        });
+
+        function fetchData() {
+            Papa.parse(csvUrl, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        processRawData(results.data);
+                    } else {
+                        showError("Los datos remotos no tienen una cabecera reconocible.");
+                    }
+                },
+                error: function() {
+                    showError("Error de sincronización con Google Sheets. Verifica permisos compartidos.");
+                }
+            });
+        }
+
+        function processRawData(data) {
+            rawData = data.map(row => {
+                // Inteligencia de mapeo: detecta tus columnas nativas ('ADUA_DESC', 'EXPORTADOR', 'FOB_DOLPOL')
+                let sucursal = row['sucursal'] || row['ADUA_DESC'] || 'Principal';
+                let categoria = row['categoria'] || row['EXPORTADOR'] || row['DESCRIP'] || 'General';
+                let ventas = parseFloat(row['ventas'] || row['FOB_DOLPOL'] || 0);
+                let margen = parseFloat(row['margen'] || (ventas * 0.28)); // 28% de margen por defecto si la base es transaccional plana
+                
+                let mesText = "Ene";
+                if (row['FECHA']) {
+                    let dateStr = row['FECHA'].toString();
+                    if (dateStr.length >= 6) {
+                        let mesNum = parseInt(dateStr.substring(4, 6)) - 1;
+                        if (mesNum >= 0 && mesNum < 12) mesText = nombresMeses[mesNum];
+                    }
+                } else if (row['mes']) {
+                    mesText = row['mes'];
+                }
+
+                if(categoria.length > 25) categoria = categoria.substring(0, 25) + '...';
+
+                return {
+                    sucursal: sucursal.trim(),
+                    categoria: categoria.trim(),
+                    mes: mesText,
+                    ventas: isNaN(ventas) ? 0 : ventas,
+                    margen: isNaN(margen) ? 0 : margen
+                };
+            });
+
+            populateFilters();
+            updateDashboard();
+        }
+
+        function populateFilters() {
+            const sucursales = [...new Set(rawData.map(r => r.sucursal))].sort();
+            const categorias = [...new Set(rawData.map(r => r.categoria))].sort();
+            const meses = [...new Set(rawData.map(r => r.mes))];
+
+            const selectSuc = document.getElementById('filterSucursal');
+            const selectCat = document.getElementById('filterCategoria');
+            const selectMes = document.getElementById('filterMes');
+
+            sucursales.forEach(s => selectSuc.add(new Option(s, s)));
+            categorias.forEach(c => selectCat.add(new Option(c, c)));
+            nombresMeses.forEach(m => {
+                if (meses.includes(m)) selectMes.add(new Option(m, m));
+            });
+        }
+
+        function updateDashboard() {
+            const selSuc = document.getElementById('filterSucursal').value;
+            const selCat = document.getElementById('filterCategoria').value;
+            const selMes = document.getElementById('filterMes').value;
+
+            const filtered = rawData.filter(r => {
+                return (selSuc === 'ALL' || r.sucursal === selSuc) &&
+                       (selCat === 'ALL' || r.categoria === selCat) &&
+                       (selMes === 'ALL' || r.mes === selMes);
+            });
+
+            const totalVentas = filtered.reduce((acc, r) => acc + r.ventas, 0);
+            const totalMargen = filtered.reduce((acc, r) => acc + r.margen, 0);
+            const pctMargen = totalVentas > 0 ? (totalMargen / totalVentas) * 100 : 0;
+
+            document.getElementById('kpiVentas').innerText = 'S/ ' + totalVentas.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('kpiMargen').innerText = 'S/ ' + totalMargen.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('kpiPorcentaje').innerText = pctMargen.toFixed(1) + '%';
+
+            renderCharts(filtered);
+            renderTable(filtered);
+        }
+
+        function renderCharts(data) {
+            const mesesMap = {};
+            nombresMeses.forEach(m => mesesMap[m] = { ventas: 0, margen: 0 });
+            data.forEach(r => {
+                if(mesesMap[r.mes]) {
+                    mesesMap[r.mes].ventas += r.ventas;
+                    mesesMap[r.mes].margen += r.margen;
+                }
+            });
+
+            const labelsMensuales = nombresMeses.filter(m => mesesMap[m].ventas > 0);
+            const datosVentasMes = labelsMensuales.map(m => mesesMap[m].ventas);
+            const datosMargenMes = labelsMensuales.map(m => mesesMap[m].margen);
+
+            if (chartMensualInstance) chartMensualInstance.destroy();
+            const ctxMensual = document.getElementById('chartMensual').getContext('2d');
+            chartMensualInstance = new Chart(ctxMensual, {
+                type: 'bar',
+                data: {
+                    labels: labelsMensuales,
+                    datasets: [
+                        { label: 'Ventas (S/)', data: datosVentasMes, backgroundColor: '#3B82F6', borderRadius: 6 },
+                        { label: 'Margen (S/)', data: datosMargenMes, backgroundColor: '#8B5CF6', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9EA5B1' } } },
+                    scales: {
+                        x: { ticks: { color: '#9EA5B1' }, grid: { display: false } },
+                        y: { ticks: { color: '#9EA5B1' }, grid: { color: '#2D3238' } }
+                    }
+                }
+            });
+
+            const catMap = {};
+            data.forEach(r => { catMap[r.categoria] = (catMap[r.categoria] || 0) + r.ventas; });
+            const sortedCats = Object.keys(catMap).sort((a,b) => catMap[b] - catMap[a]).slice(0, 5);
+            const datosCats = sortedCats.map(c => catMap[c]);
+
+            if (chartCategoriasInstance) chartCategoriasInstance.destroy();
+            const ctxCats = document.getElementById('chartCategorias').getContext('2d');
+            chartCategoriasInstance = new Chart(ctxCats, {
+                type: 'doughnut',
+                data: {
+                    labels: sortedCats,
+                    datasets: [{ data: datosCats, backgroundColor: ['#14B8A6', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'], borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { color: '#9EA5B1', font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Sin registros.</td></tr>`;
+                return;
+            }
+            data.slice(0, 15).forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>\u2022 ${r.sucursal}</td>
+                    <td>${r.categoria}</td>
+                    <td>${r.mes}</td>
+                    <td class="text-right">${r.ventas.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                    <td class="text-right text-accent">${r.margen.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showError(msg) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.innerText = msg;
+            alertBox.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
